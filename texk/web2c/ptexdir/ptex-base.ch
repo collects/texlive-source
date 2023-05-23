@@ -458,6 +458,12 @@ if last<>first then print_unread_buffer_with_ptenc(first,last);
 @z
 
 @x
+@d max_quarterword=255 {largest allowable value in a |quarterword|}
+@y
+@d max_quarterword=@"FFFF {largest allowable value in a |quarterword|}
+@z
+
+@x
 @d max_halfword==@"FFFFFFF {largest allowable value in a |halfword|}
 @y
 @d max_halfword==@"FFFFFFF {largest allowable value in a |halfword|}
@@ -731,7 +737,7 @@ of larger type codes will also be defined, for use in math mode only.
 @x [12.???] pTeX: \ptexfontname, \ptextracingfonts
 @p procedure short_display(@!p:integer); {prints highlights of list |p|}
 @y
-@p@t\4@>@<Declare the pTeX-specific |print_font_...| procedures|@>@;@/
+@p@t\4@>@<Declare the pTeX-specific |print_font_...| procedures@>@;@/
 procedure short_display(@!p:integer); {prints highlights of list |p|}
 @z
 
@@ -1274,8 +1280,8 @@ primitive("xkanjiskip",assign_glue,glue_base+xkanji_skip_code);@/
   {table of 256 command codes for the wchar's catcodes }
 @d auto_xsp_code_base=kcat_code_base+256 {table of 256 auto spacer flag}
 @d inhibit_xsp_code_base=auto_xsp_code_base+256
-@d kinsoku_base=inhibit_xsp_code_base+256 {table of 256 kinsoku mappings}
-@d kansuji_base=kinsoku_base+256 {table of 10 kansuji mappings}
+@d kinsoku_base=inhibit_xsp_code_base+1024 {table of 1024 kinsoku mappings}
+@d kansuji_base=kinsoku_base+1024 {table of 10 kansuji mappings}
 @d lc_code_base=kansuji_base+10 {table of 256 lowercase mappings}
 @z
 
@@ -1321,7 +1327,10 @@ eqtb[auto_xspacing_code]:=eqtb[cat_code_base];
 for k:=0 to 255 do
   begin cat_code(k):=other_char; kcat_code(k):=other_kchar;
   math_code(k):=hi(k); sf_code(k):=1000;
-  auto_xsp_code(k):=0; inhibit_xsp_code(k):=0; inhibit_xsp_type(k):=0;
+  auto_xsp_code(k):=0;
+  end;
+for k:=0 to 1023 do
+  begin inhibit_xsp_code(k):=0; inhibit_xsp_type(k):=0;
   kinsoku_code(k):=0; kinsoku_type(k):=0;
   end;
 @z
@@ -1659,7 +1668,7 @@ begin
   end;
 end;
 
-@ @<Declare the pTeX-specific |print_font_...| procedures|@>=
+@ @<Declare the pTeX-specific |print_font_...| procedures@>=
 procedure print_font_name_and_size(f:internal_font_number);
 begin
   print(font_name[f]);
@@ -2367,18 +2376,16 @@ procedure scan_something_internal(@!level:small_number;@!negative:boolean);
 var m:halfword; {|chr_code| part of the operand token}
 @y
 var m:halfword; {|chr_code| part of the operand token}
+@!q,@!r:pointer; {general purpose indices}
 @!tx:pointer; {effective tail node}
 @!qx:halfword; {general purpose index}
 @z
 @x [26.413] l.8345 - pTeX: scan_something_internal
-begin m:=cur_chr;
 case cur_cmd of
 def_code: @<Fetch a character code from some table@>;
 toks_register,assign_toks,def_family,set_font,def_font: @<Fetch a token list or
   font identifier, provided that |level=tok_val|@>;
 @y
-@!q,@!r:pointer;
-begin m:=cur_chr;
 case cur_cmd of
 assign_kinsoku: @<Fetch breaking penalty from some table@>;
 assign_inhibit_xsp_code: @<Fetch inhibit type from some table@>;
@@ -2878,8 +2885,8 @@ if_tdir_code: b:=(abs(direction)=dir_tate);
 if_ydir_code: b:=(abs(direction)=dir_yoko);
 if_ddir_code: b:=(abs(direction)=dir_dtou);
 if_mdir_code: b:=(direction<0);
-if_void_code, if_hbox_code, if_vbox_code, if_tbox_code, if_ybox_code, if_dbox_code, if_mbox_code:
-  @<Test box register status@>;
+if_tbox_code, if_ybox_code, if_dbox_code, if_mbox_code,
+if_void_code, if_hbox_code, if_vbox_code: @<Test box register status@>;
 if_jfont_code, if_tfont_code:
   begin scan_font_ident;
   if this_if=if_jfont_code then b:=(font_dir[cur_val]=dir_yoko)
@@ -4590,6 +4597,17 @@ inhibit_glue_flag:=false;
   u:=hpack(link(head),natural); w:=width(u);
 @z
 
+@x [37.???] l.????? - increased max_quarterword
+if n>max_quarterword then confusion("256 spans"); {this can happen, but won't}
+@^system dependencies@>
+@:this can't happen 256 spans}{\quad 256 spans@>
+@y
+if n>max_quarterword then confusion("too many spans");
+   {this can happen, but won't}
+@^system dependencies@>
+@:this can't happen too many spans}{\quad too many spans@>
+@z
+
 @x [37.799] l.16331 - fin_row: pTeX: call adjust_hlist
   begin p:=hpack(link(head),natural);
 @y
@@ -5953,8 +5971,10 @@ while link(tail)<>null do
   {reset |inhibit_glue_flag| when a node other than |disp_node| is found;
    |disp_node| is always inserted according to tex-jp-build issue 40}
   begin p:=tail; tail:=link(tail);
-  if is_char_node(tail) then
-    inhibit_glue_flag:=false
+  if is_char_node(tail) then begin
+    inhibit_glue_flag:=false;
+    if font_dir[font(tail)]<>dir_default then last_jchr:=link(tail);
+    end
   else
     case type(tail) of
     glue_node : begin
@@ -6843,6 +6863,13 @@ undump_things(char_base[null_font], font_ptr+1-null_font);
   font_info:=xmalloc_array (memory_word, font_mem_size);
 @z
 
+@x
+fix_date_and_time;@/
+@y
+last:=ptenc_conv_first_line(loc, last, buffer, buf_size); limit:=last;
+fix_date_and_time;@/
+@z
+
 @x [51.1337] l.25563 - pTeX:
   font_check:=xmalloc_array(four_quarters, font_max);
 @y
@@ -7211,7 +7238,7 @@ inserting a space between 2byte-char and 1byte-char.
 @d inhibit_after=2    {disable to insert space after 2byte-char}
 @d inhibit_none=3     {enable to insert space before/after 2byte-char}
 @d inhibit_unused=4   {unused entry}
-@d no_entry=1000
+@d no_entry=10000
 @d new_pos=0
 @d cur_pos=1
 
@@ -7243,7 +7270,7 @@ if n=new_pos then
     begin if pp<>no_entry then p:=pp; goto done; end;
   if inhibit_xsp_type(p)=inhibit_unused then
     if pp=no_entry then pp:=p; { save the nearest unused hash }
-  incr(p); if p>255 then p:=0;
+  incr(p); if p>1023 then p:=0;
   until s=p;
   p:=pp;
   end
@@ -7251,7 +7278,7 @@ else
   begin repeat
   if inhibit_xsp_code(p)=0 then goto done1;
   if inhibit_xsp_code(p)=c then goto done;
-  incr(p); if p>255 then p:=0;
+  incr(p); if p>1023 then p:=0;
   until s=p;
 done1: p:=no_entry;
   end;
@@ -7326,7 +7353,7 @@ if n=new_pos then
     begin if pp<>no_entry then p:=pp; goto done; end;
   if kinsoku_type(p)=kinsoku_unused_code then
     if pp=no_entry then pp:=p; { save the nearest unused hash }
-  incr(p); if p>255 then p:=0;
+  incr(p); if p>1023 then p:=0;
   until s=p;
   p:=pp;
   end
@@ -7334,7 +7361,7 @@ else
   begin repeat
   if kinsoku_type(p)=0 then goto done1;
   if kinsoku_code(p)=c then goto done;
-  incr(p); if p>255 then p:=0;
+  incr(p); if p>1023 then p:=0;
   until s=p;
 done1: p:=no_entry;
   end;

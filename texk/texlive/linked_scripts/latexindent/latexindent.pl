@@ -1,5 +1,5 @@
 #!/usr/bin/env perl
-#   latexindent.pl, version 3.18, 2022-06-12
+#   latexindent.pl, version 3.21.1, 2023-05-20
 #
 #	This program is free software: you can redistribute it and/or modify
 #	it under the terms of the GNU General Public License as published by
@@ -58,7 +58,7 @@ GetOptions(
 # conditionally load the GCString module
 eval "use Unicode::GCString" if $switches{GCString};
 
-# check local settings doesn't interfer with reading the file;
+# check local settings doesn't interfere with reading the file;
 # this can happen if the script is called as follows:
 #
 #       latexindent.pl -l myfile.tex
